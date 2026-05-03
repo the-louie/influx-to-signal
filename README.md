@@ -61,8 +61,11 @@ Edit `.env` and fill in all values:
 | `RUN_ON_STARTUP` | Set to `true` to send a message immediately when the container starts (default: `false`) |
 | `ACTIVE_FROM` | Start date for the active period, format `YYYY-MM-DD` (optional, inclusive) |
 | `ACTIVE_TO` | End date for the active period, format `YYYY-MM-DD` (optional, inclusive) |
+| `MIN_TEMPERATURE` | Minimum temperature in °C to trigger a message (optional) |
 
 When both `ACTIVE_FROM` and `ACTIVE_TO` are set, the bot only sends messages if today falls within that window. Leave both empty to send year-round. This is useful for seasonal reporting, e.g. only during the warmer months.
+
+When `MIN_TEMPERATURE` is set, the bot skips sending if the recorded max temperature is below that value. For example, set `MIN_TEMPERATURE=15` to only report when it has been at least 15°C.
 
 ### 3. Link your Signal account
 
