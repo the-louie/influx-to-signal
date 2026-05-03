@@ -104,6 +104,8 @@ def send_signal_message(text: str) -> None:
         "recipients": [SIGNAL_RECIPIENT],
     }
     resp = requests.post(url, json=payload, timeout=30)
+    if not resp.ok:
+        log.error("Signal API responded %s: %s", resp.status_code, resp.text)
     resp.raise_for_status()
     log.info("Signal message sent (timestamp: %s)", resp.json().get("timestamp"))
 
@@ -162,7 +164,7 @@ def main() -> None:
         return
 
     local_time = datetime.fromisoformat(ts).astimezone(TZ).strftime("%H:%M")
-    message = f"🌡️ Högsta temperatur ({yesterday} – {today}): {temp}°C (kl {local_time})"
+    message = f"🌡️ Högsta temperatur senaste dygnet: {temp}°C (kl {local_time})"
     log.info("Sending: %s", message)
 
     try:
