@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+__doc
+__pycache__
+*.md
+TODO.md
