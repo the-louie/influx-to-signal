@@ -2,4 +2,4 @@
 
 See README.md for full project documentation.
 
-Single-file Python script (main.py) triggered as a one-shot Docker container via host crontab. Queries InfluxDB, sends result to Signal group via signal-cli-rest-api.
+Docker stack with two services: signal-cli-rest-api (Signal backend) and publisher (Python + cron). Queries InfluxDB for max temperature, sends to Signal group. Cron runs inside the publisher container (default 10:00 daily). Manual trigger via `docker compose exec publisher python main.py`.
