@@ -1,11 +1,11 @@
 # Temperature Bot
 
-A Python script that queries InfluxDB for the highest temperature since the start of yesterday (i.e. yesterday + today so far) and publishes it to a Signal group chat.
+A Python bot that queries InfluxDB for the highest temperature since the start of yesterday (i.e. yesterday + today so far) and publishes it to a Signal group chat. Runs as a long-lived Docker stack with its own cron schedule alongside a bundled signal-cli-rest-api instance.
 
 ## Architecture
 
-- **main.py** — single-file script: queries InfluxDB, sends result via signal-cli-rest-api
-- Runs as a one-shot container, triggered by a host crontab entry
+- **signal-api** — [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) container, provides the Signal messaging backend
+- **publisher** — Python container with internal cron that queries InfluxDB and sends the result via signal-api
 - All configuration via `.env` (copy `.env.example`)
 
 ## Dependencies
@@ -13,8 +13,6 @@ A Python script that queries InfluxDB for the highest temperature since the star
 - `influxdb-client` — InfluxDB v2 Python client (Flux queries)
 - `requests` — HTTP POST to signal-cli-rest-api `/v2/send` endpoint
 - `python-dotenv` — loads `.env` file
-
-Signal integration uses the [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) REST endpoint directly (not the signalbot framework, which is designed for long-running interactive bots).
 
 ## Deployment
 
@@ -53,24 +51,42 @@ Edit `.env` and fill in all values:
 | `DEVICE_ID` | Flux device_id tag filter, e.g. `gisebo-01` |
 | `HOST_FILTER` | Flux host tag filter, e.g. `61781446e5e9` |
 | `TZ_OFFSET_HOURS` | UTC offset for determining "start of yesterday" (default: `2` for CEST) |
+| `SIGNAL_API_MODE` | signal-cli-rest-api mode: `normal`, `native`, `json-rpc`, or `json-rpc-native` (default: `json-rpc`) |
+| `SIGNAL_API_PORT` | Host port to expose signal-cli-rest-api on (default: `8080`) |
 | `SIGNAL_PROTOCOL` | `http` or `https` (default: `http`) |
-| `SIGNAL_SERVICE` | signal-cli-rest-api host:port, e.g. `signal-api:8080` |
-| `SIGNAL_PHONE_NUMBER` | Bot phone number, e.g. `+46701234567` |
+| `SIGNAL_SERVICE` | signal-cli-rest-api host:port as seen by the publisher container (default: `signal-api:8080`) |
+| `SIGNAL_PHONE_NUMBER` | Bot phone number in E.164 format, e.g. `+46701234567` |
 | `SIGNAL_RECIPIENT` | Group ID or phone number to send to |
+| `CRON_SCHEDULE` | Cron expression for the publish schedule (default: `0 10 * * *`, daily at 10:00) |
+| `RUN_ON_STARTUP` | Set to `true` to send a message immediately when the container starts (default: `false`) |
 
-### 3. Find the Signal group ID
+### 3. Link your Signal account
 
-The bot sends messages via the [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api). To send to a group chat, you need the group's internal ID.
-
-**Prerequisites:** The signal-cli-rest-api service must be running and linked to your phone number (see the [signal-cli-rest-api setup guide](https://github.com/bbernhard/signal-cli-rest-api#getting-started)).
-
-List all groups the linked account is a member of:
+The signal-cli-rest-api service must be linked to your Signal account before it can send messages. Start the stack in normal mode first:
 
 ```bash
-curl -s http://<signal-api-host>:8080/v1/groups/<your-phone-number> | python3 -m json.tool
+# Override mode temporarily for linking
+SIGNAL_API_MODE=normal docker compose up signal-api
 ```
 
-This returns a JSON array. Each group entry looks like:
+Open the QR code link in your browser and scan it with your Signal app (Settings > Linked Devices > Link New Device):
+
+```
+http://localhost:8080/v1/qrcodelink?device_name=temperature-bot
+```
+
+Once linked, stop the service with `Ctrl+C`. The credentials are persisted in `./signal-cli-config/`.
+
+### 4. Find the Signal group ID
+
+With the service running, list all groups the linked account is a member of:
+
+```bash
+docker compose up -d signal-api
+curl -s http://localhost:8080/v1/groups/<your-phone-number> | python3 -m json.tool
+```
+
+Each group entry looks like:
 
 ```json
 {
@@ -93,34 +109,39 @@ To send to an individual contact instead of a group, use their phone number in E
 SIGNAL_RECIPIENT=+46701234567
 ```
 
-### 4. Build the container
+### 5. Build and start the stack
 
 ```bash
 docker compose build
+docker compose up -d
 ```
 
-### 5. Test manually
+The publisher container runs cron in the foreground and will send the temperature message on the configured schedule (default: daily at 10:00).
 
-Run the script once to verify the full pipeline works:
+### 6. Manually trigger a message
+
+To send a message immediately without waiting for the next cron tick:
 
 ```bash
-docker compose run --rm publisher
+docker compose exec publisher python main.py
 ```
 
-You should see log output confirming the InfluxDB query and Signal message delivery.
-
-### 6. Schedule via host crontab
-
-Open the host crontab:
+Or, if the stack is not running, use `run` instead:
 
 ```bash
-crontab -e
+docker compose run --rm publisher python main.py
 ```
 
-Add an entry to trigger the bot on the desired schedule. For example, every day at 08:00:
+## Logs
 
-```cron
-0 8 * * * cd /docker/temperature-bot && docker compose run --rm publisher >> /var/log/temperature-bot.log 2>&1
+View live logs from both services:
+
+```bash
+docker compose logs -f
 ```
 
-Logs are appended to `/var/log/temperature-bot.log` for debugging.
+Publisher only:
+
+```bash
+docker compose logs -f publisher
+```
