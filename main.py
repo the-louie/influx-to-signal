@@ -153,6 +153,14 @@ def main() -> None:
         log.exception("Failed to query InfluxDB")
         sys.exit(1)
 
+    min_temp = os.environ.get("MIN_TEMPERATURE", "")
+    if min_temp and temp < float(min_temp):
+        log.info(
+            "Temperature %.1f°C is below minimum threshold %s°C, skipping.",
+            temp, min_temp,
+        )
+        return
+
     local_time = datetime.fromisoformat(ts).astimezone(TZ).strftime("%H:%M")
     message = f"🌡️ Högsta temperatur ({yesterday} – {today}): {temp}°C (kl {local_time})"
     log.info("Sending: %s", message)
