@@ -108,7 +108,41 @@ def send_signal_message(text: str) -> None:
     log.info("Signal message sent (timestamp: %s)", resp.json().get("timestamp"))
 
 
+def _is_within_active_period() -> bool:
+    """Check if today falls within the configured ACTIVE_FROM / ACTIVE_TO window.
+
+    Both dates are inclusive. If neither is set the bot is always active.
+    """
+    active_from = os.environ.get("ACTIVE_FROM", "")
+    active_to = os.environ.get("ACTIVE_TO", "")
+
+    if not active_from and not active_to:
+        return True
+
+    today = datetime.now(TZ).date()
+
+    if active_from:
+        start = datetime.strptime(active_from, "%Y-%m-%d").date()
+        if today < start:
+            return False
+
+    if active_to:
+        end = datetime.strptime(active_to, "%Y-%m-%d").date()
+        if today > end:
+            return False
+
+    return True
+
+
 def main() -> None:
+    if not _is_within_active_period():
+        log.info(
+            "Outside active period (%s – %s), skipping.",
+            os.environ.get("ACTIVE_FROM", "unset"),
+            os.environ.get("ACTIVE_TO", "unset"),
+        )
+        return
+
     yesterday = (datetime.now(TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
     today = datetime.now(TZ).strftime("%Y-%m-%d")
     log.info("Querying InfluxDB for max temperature (%s – %s)…", yesterday, today)
