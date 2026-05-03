@@ -5,5 +5,6 @@
 .gitignore
 __doc
 __pycache__
+signal-cli-config
 *.md
 TODO.md
