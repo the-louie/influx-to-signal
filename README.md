@@ -59,6 +59,10 @@ Edit `.env` and fill in all values:
 | `SIGNAL_RECIPIENT` | Group ID or phone number to send to |
 | `CRON_SCHEDULE` | Cron expression for the publish schedule (default: `0 10 * * *`, daily at 10:00) |
 | `RUN_ON_STARTUP` | Set to `true` to send a message immediately when the container starts (default: `false`) |
+| `ACTIVE_FROM` | Start date for the active period, format `YYYY-MM-DD` (optional, inclusive) |
+| `ACTIVE_TO` | End date for the active period, format `YYYY-MM-DD` (optional, inclusive) |
+
+When both `ACTIVE_FROM` and `ACTIVE_TO` are set, the bot only sends messages if today falls within that window. Leave both empty to send year-round. This is useful for seasonal reporting, e.g. only during the warmer months.
 
 ### 3. Link your Signal account
 
